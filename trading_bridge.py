@@ -26,11 +26,11 @@ class APIBase:
 class CapitalAPI(APIBase):
     def __init__(self):
         super().__init__()
-        self.api_key = os.getenv("CAPITAL_API_KEY")
+        self.api_key = os.getenv("CAPITAL_API_KEY", "default_capital_api_key")
         self.base_url = "https://api-capital.backend-capital.com"
 
-        if not self.api_key:
-            raise ValueError("CAPITAL_API_KEY environment variable is not set.")
+        if self.api_key == "default_capital_api_key":
+            logging.warning("Using default API key for CapitalAPI. Set the CAPITAL_API_KEY environment variable for production use.")
 
     def get_market_data(self, symbol):
         url = f"{self.base_url}/trading/markets/{symbol}"
@@ -49,13 +49,13 @@ class CapitalAPI(APIBase):
 class IGAPI(APIBase):
     def __init__(self):
         super().__init__()
-        self.username = os.getenv("IG_USERNAME")
-        self.password = os.getenv("IG_PASSWORD")
-        self.api_key = os.getenv("IG_API_KEY")
+        self.username = os.getenv("IG_USERNAME", "default_username")
+        self.password = os.getenv("IG_PASSWORD", "default_password")
+        self.api_key = os.getenv("IG_API_KEY", "default_ig_api_key")
         self.base_url = "https://demo-api.ig.com/gateway/deal"
 
-        if not all([self.username, self.password, self.api_key]):
-            raise ValueError("One or more IG credentials (username, password, API key) environment variables are not set.")
+        if "default_" in {self.username, self.password, self.api_key}:
+            logging.warning("Using default credentials for IGAPI. Set the IG_USERNAME, IG_PASSWORD, and IG_API_KEY environment variables for production use.")
 
     def authenticate(self):
         url = f"{self.base_url}/session"
@@ -99,5 +99,3 @@ class IGAPI(APIBase):
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to get market data from IG: {e}")
             return None
-
-# The usage code is omitted for a module intended for import and testing.
