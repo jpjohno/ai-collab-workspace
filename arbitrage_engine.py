@@ -41,9 +41,7 @@ class ArbitrageEngine:
                 "capital_data": capital_data,
                 "ig_data": ig_data
             }
-```
 
-```python
 # trading_bridge.py (Assuming this file exists)
 
 class CapitalAPI:
