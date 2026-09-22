@@ -1,55 +1,38 @@
-# arbitrage_engine.py
+import logging
 
-import trading_bridge
+logger = logging.getLogger("ArbitrageEngine")
 
 class ArbitrageEngine:
-    def __init__(self, capital_api, ig_api, threshold):
+    def __init__(self, capital_api, ig_api, min_spread_threshold=0.5):
         self.capital_api = capital_api
         self.ig_api = ig_api
-        self.threshold = threshold
+        self.min_spread_threshold = min_spread_threshold
 
-    def fetch_market_data(self, instrument):
-        capital_data = self.capital_api.get_market_data(instrument)
-        ig_data = self.ig_api.get_market_data(instrument)
-        return capital_data, ig_data
+    def evaluate_spread(self, capital_epic, ig_epic):
+        capital_data = self.capital_api.get_market_data(capital_epic)
+        ig_data = self.ig_api.get_market_data(ig_epic)
 
-    def calculate_spread_discrepancy(self, capital_data, ig_data):
-        capital_bid = capital_data['bid']
-        capital_ask = capital_data['ask']
-        ig_bid = ig_data['bid']
-        ig_ask = ig_data['ask']
+        # Extract bid/ask safely
+        cap_bid = float(capital_data.get("bid", capital_data.get("snapshot", {}).get("bid", 0)))
+        cap_ask = float(capital_data.get("ask", capital_data.get("snapshot", {}).get("offer", 0)))
+        
+        ig_bid = float(ig_data.get("bid", ig_data.get("snapshot", {}).get("bid", 0)))
+        ig_ask = float(ig_data.get("ask", ig_data.get("snapshot", {}).get("offer", 0)))
 
-        spread_discrepancy = min(
-            abs(capital_bid - ig_ask),
-            abs(ig_bid - capital_ask)
-        )
-        return spread_discrepancy
+        # Strategy 1: Buy IG, Sell Capital
+        spread_1 = cap_bid - ig_ask
+        # Strategy 2: Buy Capital, Sell IG
+        spread_2 = ig_bid - cap_ask
 
-    def evaluate_arbitrage_opportunity(self, instrument):
-        capital_data, ig_data = self.fetch_market_data(instrument)
-        spread_discrepancy = self.calculate_spread_discrepancy(capital_data, ig_data)
+        best_spread = max(spread_1, spread_2)
+        direction = "SELL_CAPITAL_BUY_IG" if spread_1 >= spread_2 else "SELL_IG_BUY_CAPITAL"
 
-        if spread_discrepancy >= self.threshold:
-            return {
-                "opportunity": True,
-                "capital_data": capital_data,
-                "ig_data": ig_data
-            }
-        else:
-            return {
-                "opportunity": False,
-                "capital_data": capital_data,
-                "ig_data": ig_data
-            }
+        opportunity = best_spread >= self.min_spread_threshold
 
-# trading_bridge.py (Assuming this file exists)
-
-class CapitalAPI:
-    def get_market_data(self, instrument):
-        # This method should return a dictionary with 'bid' and 'ask' prices for the given instrument
-        pass
-
-class IGAPI:
-    def get_market_data(self, instrument):
-        # This method should return a dictionary with 'bid' and 'ask' prices for the given instrument
-        pass
+        return {
+            "opportunity": opportunity,
+            "best_spread": best_spread,
+            "direction": direction,
+            "capital": {"bid": cap_bid, "ask": cap_ask},
+            "ig": {"bid": ig_bid, "ask": ig_ask}
+        }
