@@ -444,3 +444,6 @@ ASSISTANT: {
 ASSISTANT: It seems like the content from the page "https://open-api.capital.com/#section/Available-functionality" couldn't be retrieved directly. However, you can visit the page directly to get the information you need about the available functionality of the Capital.com API.
 
 If you provide some specific questions or details you're looking for, I might be able to help answer them or guide you on how to use the API based on general knowledge up to my last training data in September 2022. Alternatively, if you find specific information or code snippets on the page that you're unsure about, feel free to share them here, and I'll do my best to assist you!
+
+## Autonomous Implementation Phase
+Implemented initial `trading_bridge.py` targeting Capital.com and IG.com integrations.
