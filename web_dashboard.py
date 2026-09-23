@@ -202,7 +202,7 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
     <div class="telemetry-grid">
         <div class="card emerald">
             <div class="card-title">Simulated P&L Vault</div>
-            <div class="card-value" style="color: var(--accent-emerald);">${total_profit:.2f}</div>
+            <div class="card-value" style="color: var(--accent-emerald);">{total_profit}</div>
         </div>
         <div class="card">
             <div class="card-title">Total Orders Routed</div>
