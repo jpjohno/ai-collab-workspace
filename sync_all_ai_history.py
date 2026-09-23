@@ -5,26 +5,25 @@ from github import Github
 
 def sync_knowledge():
     print("🔍 Searching for past ChatGPT exports and workspace files...")
-    
     knowledge_sections = []
     
-    # 1. Look for ChatGPT conversations.json exports
+    # 1. Parse all conversations from ../conversations.json
     export_files = (
         glob.glob("conversations.json") + 
-        glob.glob("**/conversations.json", recursive=True) +
-        glob.glob("../conversations.json")
+        glob.glob("../conversations.json") +
+        glob.glob("archive/**/conversations.json", recursive=True)
     )
     
     if export_files:
         chosen_file = export_files[0]
-        print(f"📖 Found ChatGPT export at: {chosen_file}")
+        print(f"📖 Ingesting entire ChatGPT export from: {chosen_file}")
         try:
             with open(chosen_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             
             chat_logs = []
-            for conv in data[:15]: # Process up to 15 recent conversations
-                title = conv.get("title", "Untitled")
+            for conv in data:
+                title = conv.get("title", "Untitled Conversation")
                 mapping = conv.get("mapping", {})
                 convo_text = []
                 for node_id, node in mapping.items():
@@ -36,16 +35,14 @@ def sync_knowledge():
                         if text:
                             convo_text.append(f"**{role.upper()}**: {text}")
                 if convo_text:
-                    chat_logs.append(f"### Chat: {title}\n" + "\n\n".join(convo_text[-6:])) # Last few turns
+                    chat_logs.append(f"### Chat: {title}\n" + "\n\n".join(convo_text[-6:]))
             
             knowledge_sections.append("## Past ChatGPT Design Decisions\n" + "\n\n---\n\n".join(chat_logs))
-            print(f"✅ Ingested {len(chat_logs)} chat threads from export.")
+            print(f"✅ Ingested {len(chat_logs)} total chat threads into context.")
         except Exception as e:
-            print(f"⚠️ Note parsing conversations.json: {e}")
-    else:
-        print("ℹ️ No conversations.json found locally. (Drop it into ~/trading_workspace anytime to parse)")
+            print(f"⚠️ Note parsing export: {e}")
 
-    # 2. Pull down shared_context.md from GitHub
+    # 2. Pull remote shared_context.md from GitHub
     token = os.getenv("GITHUB_TOKEN")
     if token:
         try:
