@@ -1,3 +1,4 @@
+from telegram_notifier import TelegramNotifier
 import os
 import time
 import logging
@@ -16,6 +17,7 @@ class AutonomousTrader:
         self.ig_epic = ig_epic
         self.min_spread = min_spread
         self.trade_size = trade_size
+        self.notifier = TelegramNotifier()
 
     def execute_arbitrage_cycle(self):
         logger.info(f"Scanning spreads: Capital ({self.capital_epic}) vs IG ({self.ig_epic})...")
@@ -35,6 +37,20 @@ class AutonomousTrader:
             else:
                 cap_res = self.capital_api.place_order(self.capital_epic, "BUY", self.trade_size)
                 ig_res = self.ig_api.place_order(self.ig_epic, "SELL", self.trade_size)
+
+            # Send push alert
+            try:
+                alert_msg = (
+                    f"🚨 *Arbitrage Executed!*\n"
+                    f"• Strategy: `{direction}`\n"
+                    f"• Spread: `{spread:.4f}`\n"
+                    f"• Size: `{self.trade_size}`\n"
+                    f"• Capital: {cap_res.get('order_id', 'N/A')}\n"
+                    f"• IG: {ig_res.get('order_id', 'N/A')}"
+                )
+                self.notifier.send_message(alert_msg)
+            except Exception as e:
+                logger.warning(f"Telegram alert skipped: {e}")
 
             return {
                 "executed": True,
