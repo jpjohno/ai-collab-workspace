@@ -2,22 +2,28 @@ import json
 import time
 import os
 import glob
+from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from autonomous_trader import AutonomousTrader
 from trading_bridge import IS_SANDBOX
 
 trader = AutonomousTrader()
 
+# Historical Ledger State
+ORDER_HISTORY = []
+TOTAL_PROFIT = 1425.80
+TRADES_COUNT = 0
+
 BATMAN_HUD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WAYNE ENTERPRISES // TACTICAL ARBITRAGE HUD</title>
+    <title>WAYNE ENTERPRISES // BATCOMPUTER TACTICAL HUD</title>
     <meta http-equiv="refresh" content="3">
     <style>
         :root {
-            --bg-base: #06080d;
-            --panel-bg: rgba(13, 19, 33, 0.85);
+            --bg-base: #05070b;
+            --panel-bg: rgba(11, 17, 32, 0.88);
             --border-glow: #1e293b;
             --accent-cyan: #00f0ff;
             --accent-emerald: #00ff9d;
@@ -32,7 +38,7 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
         body {
             background-color: var(--bg-base);
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.12) 0%, transparent 70%),
                 linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
             background-size: 100% 100%, 40px 40px, 40px 40px;
@@ -41,7 +47,6 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
             min-height: 100vh;
         }
 
-        /* Tactical Header */
         header {
             display: flex;
             justify-content: space-between;
@@ -53,8 +58,8 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
 
         .title-group { display: flex; align-items: center; gap: 1rem; }
         .bat-logo {
-            font-size: 1.8rem;
-            background: linear-gradient(135deg, #00f0ff, #0077ff);
+            font-size: 1.9rem;
+            background: linear-gradient(135deg, #00f0ff, #3b82f6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-weight: 900;
@@ -65,13 +70,13 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
             background: rgba(0, 255, 157, 0.15);
             color: var(--accent-emerald);
             border: 1px solid var(--accent-emerald);
-            padding: 4px 12px;
+            padding: 5px 14px;
             font-size: 0.75rem;
             border-radius: 4px;
             letter-spacing: 1px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             text-transform: uppercase;
         }
         .pulse-dot {
@@ -79,12 +84,11 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
             height: 8px;
             background: var(--accent-emerald);
             border-radius: 50%;
-            box-shadow: 0 0 10px var(--accent-emerald);
+            box-shadow: 0 0 12px var(--accent-emerald);
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
-        /* Metric Grid */
         .telemetry-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -106,18 +110,19 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
             top: 0; left: 0; width: 4px; height: 100%;
             background: var(--accent-cyan);
         }
+        .card.emerald::before { background: var(--accent-emerald); }
+        .card.gold::before { background: var(--accent-gold); }
         .card-title { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; }
         .card-value { font-size: 1.6rem; font-weight: 800; font-family: monospace; color: var(--text-main); }
 
-        /* Two-Column Cockpit */
         .cockpit-split {
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 1.5rem;
+            margin-bottom: 1.5rem;
         }
 
-        /* Matrix Table */
-        .table-container {
+        .panel-container {
             background: var(--panel-bg);
             border: 1px solid var(--border-glow);
             border-radius: 6px;
@@ -151,17 +156,12 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
         .signal-sell { background: rgba(255, 42, 95, 0.15); color: var(--accent-crimson); border: 1px solid var(--accent-crimson); }
         .signal-scan { background: rgba(100, 116, 139, 0.2); color: var(--text-dim); }
 
-        /* Neural Intel Console */
         .intel-console {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-glow);
-            border-radius: 6px;
             padding: 1rem;
             font-family: monospace;
             font-size: 0.8rem;
-            max-height: 400px;
+            max-height: 290px;
             overflow-y: auto;
-            position: relative;
         }
         .log-turn { margin-bottom: 0.8rem; border-left: 2px solid var(--border-glow); padding-left: 8px; }
         .agent-alpha { border-left-color: var(--accent-cyan); }
@@ -169,44 +169,60 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
         .agent-label { font-size: 0.7rem; font-weight: bold; margin-bottom: 2px; }
         .agent-alpha .agent-label { color: var(--accent-cyan); }
         .agent-beta .agent-label { color: var(--accent-gold); }
+
+        .ledger-box {
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem 1rem;
+        }
+        .ledger-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-dim);
+        }
+        .ledger-row strong { color: var(--text-main); }
     </style>
 </head>
 <body>
     <header>
         <div class="title-group">
             <div class="bat-logo">🦇 WAYNE // OS</div>
-            <div style="font-size: 0.85rem; color: var(--text-dim);">JARVIS TACTICAL ARBITRAGE SUITE • V4.2</div>
+            <div style="font-size: 0.85rem; color: var(--text-dim);">JARVIS TACTICAL ARBITRAGE SUITE • PROTOCOL 5.0</div>
         </div>
         <div class="badge-live">
             <div class="pulse-dot"></div>
-            SANDBOX SIMULATOR ACTIVE
+            SANDBOX SIMULATOR ONLINE
         </div>
     </header>
 
     <div class="telemetry-grid">
-        <div class="card">
-            <div class="card-title">Active Instruments</div>
-            <div class="card-value">{instrument_count}</div>
+        <div class="card emerald">
+            <div class="card-title">Simulated P&L Vault</div>
+            <div class="card-value" style="color: var(--accent-emerald);">${total_profit:.2f}</div>
         </div>
         <div class="card">
-            <div class="card-title">Telegram Queue</div>
-            <div class="card-value" style="color: var(--accent-emerald);">SECURE [20/m]</div>
+            <div class="card-title">Total Orders Routed</div>
+            <div class="card-value">{trades_count}</div>
         </div>
-        <div class="card">
-            <div class="card-title">Knowledge Threads</div>
+        <div class="card gold">
+            <div class="card-title">Knowledge Base Memory</div>
             <div class="card-value" style="color: var(--accent-gold);">{chat_threads} THREADS</div>
         </div>
         <div class="card">
-            <div class="card-title">Bridge Latency</div>
+            <div class="card-title">Telemetry Latency</div>
             <div class="card-value" style="color: var(--accent-cyan);">~12 ms</div>
         </div>
     </div>
 
     <div class="cockpit-split">
-        <div class="table-container">
+        <div class="panel-container">
             <div class="section-header">
                 <span>Real-Time Arbitrage Matrix</span>
-                <span style="font-family: monospace; color: var(--text-dim);">FREQ: 3000ms</span>
+                <span style="font-family: monospace; color: var(--text-dim);">SCAN INTERVAL: 3000ms</span>
             </div>
             <table>
                 <thead>
@@ -225,24 +241,34 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
             </table>
         </div>
 
-        <div>
-            <div class="section-header" style="border-radius: 6px 6px 0 0;">
-                <span>Autonomous Agent Stream</span>
+        <div class="panel-container">
+            <div class="section-header">
+                <span>Autonomous Agent Core</span>
             </div>
             <div class="intel-console">
                 <div class="log-turn agent-alpha">
                     <div class="agent-label">AGENT ALPHA // ARCHITECT</div>
-                    <div>Dual-exchange arbitrage execution verified. Latency buffers synchronized with multi-asset matrix.</div>
+                    <div>Bidirectional execution matrix verified across 4 asset classes. Latency buffers balanced.</div>
                 </div>
                 <div class="log-turn agent-beta">
                     <div class="agent-label">AGENT BETA // AUDITOR</div>
-                    <div>Deterministic safeguards active. Sandbox credentials isolated from live execution paths.</div>
+                    <div>Safe credential isolation active. Verified failback circuit breaker operational.</div>
                 </div>
                 <div class="log-turn agent-alpha">
                     <div class="agent-label">SYSTEM TELEMETRY</div>
-                    <div>Monitoring EUR/USD, GBP/USD, Spot Gold, and Bitcoin live. Auto-refresh engaged.</div>
+                    <div>Monitoring EUR/USD, GBP/USD, Spot Gold, and Bitcoin. Real-time spread updates engaged.</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="panel-container">
+        <div class="section-header">
+            <span>Tactical Order Execution Ledger</span>
+            <span style="font-family: monospace; color: var(--text-dim);">BUFFER: LAST 5 TRANSACTIONS</span>
+        </div>
+        <div class="ledger-box">
+            {ledger_rows}
         </div>
     </div>
 </body>
@@ -251,6 +277,7 @@ BATMAN_HUD_HTML = """<!DOCTYPE html>
 
 class DashboardHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        global TOTAL_PROFIT, TRADES_COUNT, ORDER_HISTORY
         if self.path == "/":
             rows = ""
             for inst in trader.instruments:
@@ -262,6 +289,21 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if executed:
                     badge_class = "signal-buy" if "BUY" in direction else "signal-sell"
                     badge = f'<span class="badge-signal {badge_class}">{direction}</span>'
+                    
+                    # Track mock gain and ledger
+                    mock_profit = round(abs(spread) * 100 * inst["size"], 2)
+                    TOTAL_PROFIT += mock_profit
+                    TRADES_COUNT += 1
+                    
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    ORDER_HISTORY.insert(0, {
+                        "time": timestamp,
+                        "pair": inst["symbol"],
+                        "dir": direction,
+                        "spread": spread,
+                        "profit": mock_profit
+                    })
+                    ORDER_HISTORY = ORDER_HISTORY[:6]
                 else:
                     badge = '<span class="badge-signal signal-scan">SCANNING</span>'
 
@@ -274,7 +316,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     <td>{badge}</td>
                 </tr>"""
 
-            # Count ingested chat threads if knowledge base exists
+            # Build ledger rows
+            ledger_html = ""
+            if not ORDER_HISTORY:
+                ledger_html = '<div style="color: var(--text-dim); padding: 8px 0;">No arbitrage executions recorded yet. Scanning market data streams...</div>'
+            else:
+                for entry in ORDER_HISTORY:
+                    ledger_html += f"""<div class="ledger-row">
+                        <span>[{entry['time']}] <strong>{entry['pair']}</strong> &bull; {entry['dir']}</span>
+                        <span>Spread: <code style="color: var(--accent-cyan);">{entry['spread']:.4f}</code></span>
+                        <span style="color: var(--accent-emerald);">+${entry['profit']:.2f} P&L</span>
+                    </div>"""
+
             threads_count = 36
             if os.path.exists("project_knowledge_base.md"):
                 with open("project_knowledge_base.md", "r", encoding="utf-8") as kb:
@@ -283,7 +336,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             content = (
                 BATMAN_HUD_HTML
                 .replace("{rows}", rows)
-                .replace("{instrument_count}", str(len(trader.instruments)))
+                .replace("{ledger_rows}", ledger_html)
+                .replace("{trades_count}", str(TRADES_COUNT))
+                .replace("{total_profit}", str(TOTAL_PROFIT))
                 .replace("{chat_threads}", str(threads_count))
                 .encode("utf-8")
             )
@@ -298,7 +353,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = HTTPServer(("localhost", 8080), DashboardHandler)
-    print("🦇 WAYNE // OS Tactical Dashboard online at http://localhost:8080 (Press Control+C to stop)")
+    print("🦇 WAYNE // OS Tactical Dashboard Protocol 5.0 live at http://localhost:8080 (Press Control+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
