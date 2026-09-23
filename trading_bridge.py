@@ -29,6 +29,10 @@ class CapitalAPI:
         self.base_url = "https://api-capital.backend-capital.com/api/v1"
 
     def get_market_data(self, epic):
+        if IS_SANDBOX:
+            base_bid = round(1.0850 + random.uniform(-0.0020, 0.0040), 4)
+            base_ask = round(base_bid + 0.0002, 4)
+            return {"epic": epic, "snapshot": {"bid": base_bid, "offer": base_ask}, "bid": base_bid, "ask": base_ask}
         url = f"{self.base_url}/markets/{epic}"
         headers = {"X-SECURITY-TOKEN": self.api_key}
         try:
@@ -75,6 +79,10 @@ class IGAPI:
             raise
 
     def get_market_data(self, epic):
+        if IS_SANDBOX:
+            base_bid = round(1.0850 + random.uniform(-0.0020, 0.0020), 4)
+            base_ask = round(base_bid + 0.0002, 4)
+            return {"epic": epic, "snapshot": {"bid": base_bid, "offer": base_ask}, "bid": base_bid, "ask": base_ask}
         url = f"{self.base_url}/markets/{epic}"
         headers = {"X-IG-API-KEY": self.api_key}
         try:
