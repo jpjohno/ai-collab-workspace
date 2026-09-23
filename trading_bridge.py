@@ -28,6 +28,22 @@ class CapitalAPI:
             raise ValueError("CAPITAL_API_KEY environment variable is not set.")
         self.base_url = "https://api-capital.backend-capital.com/api/v1"
 
+
+    def verify_live_connection(self):
+        """Verifies active session credentials against live endpoints."""
+        if IS_SANDBOX:
+            logger.info(f"[{self.__class__.__name__}] Operating in SANDBOX mode. Live connection check bypassed.")
+            return True
+        try:
+            # Simple ping/account details call to verify token
+            url = f"{self.base_url}/session"
+            headers = {"X-SECURITY-TOKEN": self.api_key}
+            res = requests.get(url, headers=headers, timeout=5)
+            return res.status_code == 200
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] Connection verification failed: {e}")
+            return False
+
     def get_market_data(self, epic):
         if IS_SANDBOX:
             base_bid = round(1.0850 + random.uniform(-0.0020, 0.0040), 4)
@@ -77,6 +93,22 @@ class IGAPI:
         except requests.RequestException as e:
             logger.error(f"IGAPI authentication failed: {e}")
             raise
+
+
+    def verify_live_connection(self):
+        """Verifies active session credentials against live endpoints."""
+        if IS_SANDBOX:
+            logger.info(f"[{self.__class__.__name__}] Operating in SANDBOX mode. Live connection check bypassed.")
+            return True
+        try:
+            # Simple ping/account details call to verify token
+            url = f"{self.base_url}/session"
+            headers = {"X-SECURITY-TOKEN": self.api_key}
+            res = requests.get(url, headers=headers, timeout=5)
+            return res.status_code == 200
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] Connection verification failed: {e}")
+            return False
 
     def get_market_data(self, epic):
         if IS_SANDBOX:
