@@ -23,7 +23,7 @@ def create_mock_response(provider, details, force_failure=False):
 
 class CapitalAPI:
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.getenv("CAPITAL_API_KEY")
+        self.api_key = api_key or os.getenv("CAPITAL_API_KEY") or ("sandbox_cap_key" if IS_SANDBOX else None)
         if not self.api_key:
             raise ValueError("CAPITAL_API_KEY environment variable is not set.")
         self.base_url = "https://api-capital.backend-capital.com/api/v1"
@@ -55,9 +55,9 @@ class CapitalAPI:
 
 class IGAPI:
     def __init__(self, username=None, password=None, api_key=None):
-        self.username = username or os.getenv("IG_USERNAME")
-        self.password = password or os.getenv("IG_PASSWORD")
-        self.api_key = api_key or os.getenv("IG_API_KEY")
+        self.username = username or os.getenv("IG_USERNAME") or ("sandbox_user" if IS_SANDBOX else None)
+        self.password = password or os.getenv("IG_PASSWORD") or ("sandbox_pass" if IS_SANDBOX else None)
+        self.api_key = api_key or os.getenv("IG_API_KEY") or ("sandbox_ig_key" if IS_SANDBOX else None)
         if not all([self.username, self.password, self.api_key]):
             raise ValueError("One or more IG credentials environment variables are not set.")
         self.base_url = "https://api.ig.com/deal"
