@@ -1,4 +1,7 @@
-import os
+import re
+
+# 1. Update autonomous_trader.py with Multi-Instrument Monitoring
+trader_code = '''import os
 import time
 import logging
 from trading_bridge import CapitalAPI, IGAPI
@@ -54,12 +57,12 @@ class AutonomousTrader:
 
             try:
                 alert_msg = (
-                    f"🚨 *Arbitrage Executed!*\n"
-                    f"• Pair: `{name}`\n"
-                    f"• Strategy: `{direction}`\n"
-                    f"• Spread: `{spread:.4f}`\n"
-                    f"• Size: `{size}`\n"
-                    f"• Capital Order: {cap_res.get('order_id', 'N/A')}\n"
+                    f"🚨 *Arbitrage Executed!*\\n"
+                    f"• Pair: `{name}`\\n"
+                    f"• Strategy: `{direction}`\\n"
+                    f"• Spread: `{spread:.4f}`\\n"
+                    f"• Size: `{size}`\\n"
+                    f"• Capital Order: {cap_res.get('order_id', 'N/A')}\\n"
                     f"• IG Order: {ig_res.get('order_id', 'N/A')}"
                 )
                 self.notifier.send_message(alert_msg)
@@ -94,3 +97,46 @@ class AutonomousTrader:
                 time.sleep(interval)
         except KeyboardInterrupt:
             logger.info("Graceful shutdown requested by user.")
+'''
+
+with open("autonomous_trader.py", "w", encoding="utf-8") as f:
+    f.write(trader_code)
+print("✅ Multi-asset matrix written to autonomous_trader.py.")
+
+# 2. Update test suite
+test_code = '''import unittest
+from unittest.mock import patch, MagicMock
+from autonomous_trader import AutonomousTrader
+
+class TestAutonomousTrader(unittest.TestCase):
+    @patch.dict("os.environ", {"CAPITAL_API_KEY": "mock_cap", "IG_USERNAME": "u", "IG_PASSWORD": "p", "IG_API_KEY": "k", "SANDBOX_MODE": "True"})
+    @patch("trading_bridge.CapitalAPI.get_market_data")
+    @patch("trading_bridge.IGAPI.get_market_data")
+    def test_single_cycle_execution(self, mock_ig_market, mock_cap_market):
+        mock_cap_market.return_value = {"bid": 105.0, "ask": 106.0}
+        mock_ig_market.return_value = {"bid": 99.0, "ask": 100.0}
+
+        trader = AutonomousTrader(min_spread=1.0)
+        res = trader.execute_arbitrage_cycle()
+        self.assertTrue(res["executed"])
+        self.assertEqual(res["direction"], "SELL_CAPITAL_BUY_IG")
+        self.assertEqual(res["capital_order"]["status"], "success")
+
+    @patch.dict("os.environ", {"CAPITAL_API_KEY": "mock_cap", "IG_USERNAME": "u", "IG_PASSWORD": "p", "IG_API_KEY": "k", "SANDBOX_MODE": "True"})
+    @patch("trading_bridge.CapitalAPI.get_market_data")
+    @patch("trading_bridge.IGAPI.get_market_data")
+    def test_multi_asset_loop(self, mock_ig_market, mock_cap_market):
+        mock_cap_market.return_value = {"bid": 100.0, "ask": 101.0}
+        mock_ig_market.return_value = {"bid": 100.0, "ask": 101.0}
+
+        test_inst = [{"symbol": "TEST/USD", "capital_epic": "TEST", "ig_epic": "CS.D.TEST.IP", "min_spread": 0.1, "size": 1.0}]
+        trader = AutonomousTrader(instruments=test_inst)
+        trader.run_continuous_loop(interval=0.01, max_iterations=2)
+
+if __name__ == "__main__":
+    unittest.main()
+'''
+
+with open("test_autonomous_trader.py", "w", encoding="utf-8") as f:
+    f.write(test_code)
+print("✅ Updated test_autonomous_trader.py.")
